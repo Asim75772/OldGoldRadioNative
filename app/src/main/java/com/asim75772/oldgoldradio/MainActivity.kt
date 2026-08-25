@@ -1,57 +1,42 @@
-package com.asim75772.oldgoldradio
+<?xml version="1.0" encoding="utf-8"?>
 
-import android.annotation.SuppressLint
-import android.os.Bundle
-import android.webkit.WebChromeClient
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import androidx.appcompat.app.AppCompatActivity
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-class MainActivity : AppCompatActivity() {
+    <uses-permission
+        android:name="android.permission.INTERNET" />
 
-    private lateinit var webView: WebView
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE" />
 
-    @SuppressLint("SetJavaScriptEnabled")
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
-        webView = WebView(this)
+    <application
+        android:allowBackup="true"
+        android:label="Old Gold Radio"
+        android:theme="@style/AppTheme">
 
-        setContentView(webView)
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
 
-        webView.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            mediaPlaybackRequiresUserGesture = false
-            cacheMode = WebSettings.LOAD_DEFAULT
-            allowFileAccess = true
-            allowContentAccess = true
-        }
+            <intent-filter>
 
-        webView.webViewClient = WebViewClient()
+                <action
+                    android:name="android.intent.action.MAIN" />
 
-        webView.webChromeClient = WebChromeClient()
+                <category
+                    android:name="android.intent.category.LAUNCHER" />
 
-        webView.loadUrl(
-            "https://asim75772.github.io/80s90s-old-is-gold/"
-        )
-    }
+            </intent-filter>
 
-    override fun onBackPressed() {
+        </activity>
 
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
-        }
-    }
+        <service
+            android:name=".PlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
-    override fun onDestroy() {
+    </application>
 
-        webView.stopLoading()
-        webView.destroy()
-
-        super.onDestroy()
-    }
-}
+</manifest>
