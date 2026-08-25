@@ -13,6 +13,7 @@ import android.os.IBinder
 class PlaybackService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
+    private var currentIndex = 0
 
     companion object {
 
@@ -43,15 +44,19 @@ class PlaybackService : Service() {
         private const val CHANNEL_ID =
             "old_gold_radio"
 
-        private const val NOTIFICATION_ID =
-            1001
+        private const val NOTIFICATION_ID = 1001
 
-        /*
-         * আপাতত এই URL রাখা হলো।
-         * পরে আপনার আসল radio stream URL এখানে বসাব।
-         */
-        const val RADIO_URL =
-            "https://example.com/radio.mp3"
+        private val STREAMS = arrayOf(
+            "https://stream.zeno.fm/n2fd0edh9k8uv",
+            "https://stream.zeno.fm/0ghtfp8ztm0uv",
+            "https://stream.zeno.fm/87xam8pf7tzuv",
+            "https://stream.zeno.fm/t39watus1p8uv",
+            "https://stream.zeno.fm/0zkr7x8ztm0uv",
+            "https://stream.zeno.fm/u0hrd3xkzhhvv",
+            "https://stream.zeno.fm/fdgs82xkzhhvv",
+            "https://stream.zeno.fm/6n6ewddtad0uv",
+            "https://stream.zeno.fm/60ef4p33vxquv"
+        )
     }
 
     override fun onCreate() {
@@ -74,10 +79,21 @@ class PlaybackService : Service() {
         when (intent?.action) {
 
             ACTION_PLAY -> {
+
+                val index = intent.getIntExtra(
+                    EXTRA_INDEX,
+                    0
+                )
+
+                if (index in STREAMS.indices) {
+                    currentIndex = index
+                }
+
                 playRadio()
             }
 
             ACTION_TOGGLE -> {
+
                 if (mediaPlayer?.isPlaying == true) {
                     pauseRadio()
                 } else {
@@ -85,7 +101,40 @@ class PlaybackService : Service() {
                 }
             }
 
+            ACTION_NEXT -> {
+
+                currentIndex++
+
+                if (currentIndex >= STREAMS.size) {
+                    currentIndex = 0
+                }
+
+                playRadio()
+            }
+
+            ACTION_PREVIOUS -> {
+
+                currentIndex--
+
+                if (currentIndex < 0) {
+                    currentIndex = STREAMS.size - 1
+                }
+
+                playRadio()
+            }
+
+            ACTION_VOLUME -> {
+
+                val volume = intent.getFloatExtra(
+                    EXTRA_VOLUME,
+                    1.0f
+                )
+
+                setVolume(volume)
+            }
+
             ACTION_STOP -> {
+
                 stopRadio()
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -98,21 +147,6 @@ class PlaybackService : Service() {
                 stopSelf()
             }
 
-            ACTION_NEXT -> {
-                playRadio()
-            }
-
-            ACTION_PREVIOUS -> {
-                playRadio()
-            }
-
-            ACTION_VOLUME -> {
-                val volume =
-                    intent.getFloatExtra(EXTRA_VOLUME, 1.0f)
-
-                setVolume(volume)
-            }
-
             else -> {
                 playRadio()
             }
@@ -123,13 +157,25 @@ class PlaybackService : Service() {
 
     private fun playRadio() {
 
-        if (mediaPlayer?.isPlaying == true) {
-            return
+        if (currentIndex !in STREAMS.indices) {
+            currentIndex = 0
         }
 
         try {
 
-            mediaPlayer?.release()
+            mediaPlayer?.let {
+
+                try {
+                    it.stop()
+                } catch (_: Exception) {
+                }
+
+                it.release()
+            }
+
+            mediaPlayer = null
+
+            val url = STREAMS[currentIndex]
 
             mediaPlayer = MediaPlayer().apply {
 
@@ -144,19 +190,19 @@ class PlaybackService : Service() {
                         .build()
                 )
 
-                setDataSource(RADIO_URL)
+                setDataSource(url)
 
                 setOnPreparedListener { player ->
                     player.start()
                 }
 
-                setOnCompletionListener {
-                    stopRadio()
-                }
-
                 setOnErrorListener { _, _, _ ->
                     stopRadio()
                     true
+                }
+
+                setOnCompletionListener {
+                    stopRadio()
                 }
 
                 prepareAsync()
@@ -165,6 +211,7 @@ class PlaybackService : Service() {
         } catch (e: Exception) {
 
             e.printStackTrace()
+            stopRadio()
         }
     }
 
@@ -172,8 +219,11 @@ class PlaybackService : Service() {
 
         try {
 
-            if (mediaPlayer?.isPlaying == true) {
-                mediaPlayer?.pause()
+            mediaPlayer?.let {
+
+                if (it.isPlaying) {
+                    it.pause()
+                }
             }
 
         } catch (e: Exception) {
@@ -186,14 +236,17 @@ class PlaybackService : Service() {
 
         try {
 
-            if (mediaPlayer != null) {
+            mediaPlayer?.let {
 
-                if (mediaPlayer?.isPlaying == true) {
-                    mediaPlayer?.stop()
+                try {
+                    if (it.isPlaying) {
+                        it.stop()
+                    }
+                } catch (_: Exception) {
                 }
 
-                mediaPlayer?.reset()
-                mediaPlayer?.release()
+                it.reset()
+                it.release()
             }
 
         } catch (e: Exception) {
@@ -208,13 +261,22 @@ class PlaybackService : Service() {
 
     private fun setVolume(volume: Float) {
 
-        val safeVolume =
-            volume.coerceIn(0.0f, 1.0f)
-
-        mediaPlayer?.setVolume(
-            safeVolume,
-            safeVolume
+        val safeVolume = volume.coerceIn(
+            0.0f,
+            1.0f
         )
+
+        try {
+
+            mediaPlayer?.setVolume(
+                safeVolume,
+                safeVolume
+            )
+
+        } catch (e: Exception) {
+
+            e.printStackTrace()
+        }
     }
 
     private fun createNotification(): Notification {
@@ -232,7 +294,7 @@ class PlaybackService : Service() {
                     "Old Gold Radio"
                 )
                 .setContentText(
-                    "Old Gold Radio is playing"
+                    "Old Gold Radio"
                 )
                 .setSmallIcon(
                     android.R.drawable.ic_media_play
@@ -248,7 +310,7 @@ class PlaybackService : Service() {
                     "Old Gold Radio"
                 )
                 .setContentText(
-                    "Old Gold Radio is playing"
+                    "Old Gold Radio"
                 )
                 .setSmallIcon(
                     android.R.drawable.ic_media_play
@@ -265,12 +327,11 @@ class PlaybackService : Service() {
             Build.VERSION_CODES.O
         ) {
 
-            val channel =
-                NotificationChannel(
-                    CHANNEL_ID,
-                    "Old Gold Radio",
-                    NotificationManager.IMPORTANCE_LOW
-                )
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Old Gold Radio",
+                NotificationManager.IMPORTANCE_LOW
+            )
 
             channel.description =
                 "Old Gold Radio playback"
@@ -280,9 +341,7 @@ class PlaybackService : Service() {
                     NotificationManager::class.java
                 )
 
-            manager.createNotificationChannel(
-                channel
-            )
+            manager.createNotificationChannel(channel)
         }
     }
 
