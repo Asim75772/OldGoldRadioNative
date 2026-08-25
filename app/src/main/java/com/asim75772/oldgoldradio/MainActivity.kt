@@ -1,35 +1,161 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+package com.asim75772.oldgoldradio
 
-    <uses-permission android:name="android.permission.INTERNET" />
+import android.os.Bundle
+import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 
-    <uses-permission
-        android:name="android.permission.FOREGROUND_SERVICE" />
+class MainActivity : AppCompatActivity() {
 
-    <uses-permission
-        android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    private lateinit var webView: WebView
 
-    <application
-        android:allowBackup="true"
-        android:label="Old Gold Radio"
-        android:theme="@style/AppTheme">
+    private val streams = arrayOf(
+        "https://stream.zeno.fm/n2fd0edh9k8uv",
+        "https://stream.zeno.fm/0ghtfp8ztm0uv",
+        "https://stream.zeno.fm/87xam8pf7tzuv",
+        "https://stream.zeno.fm/t39watus1p8uv",
+        "https://stream.zeno.fm/0zkr7x8ztm0uv",
+        "https://stream.zeno.fm/u0hrd3xkzhhvv",
+        "https://stream.zeno.fm/fdgs82xkzhhvv",
+        "https://stream.zeno.fm/6n6ewddtad0uv",
+        "https://stream.zeno.fm/60ef4p33vxquv"
+    )
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+        webView = WebView(this)
 
-        </activity>
+        setContentView(webView)
 
-        <service
-            android:name=".PlaybackService"
-            android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            mediaPlaybackRequiresUserGesture = false
+            allowFileAccess = true
+            allowContentAccess = true
+        }
 
-    </application>
+        webView.webViewClient = WebViewClient()
+        webView.webChromeClient = WebChromeClient()
 
-</manifest>
+        webView.addJavascriptInterface(
+            RadioBridge(),
+            "NativeRadio"
+        )
+
+        webView.loadUrl(
+            "https://asim75772.github.io/80s90s-old-is-gold/"
+        )
+    }
+
+    inner class RadioBridge {
+
+        @JavascriptInterface
+        fun playChannel(index: Int) {
+
+            if (index !in streams.indices) return
+
+            val intent = android.content.Intent(
+                this@MainActivity,
+                PlaybackService::class.java
+            ).apply {
+
+                action = PlaybackService.ACTION_PLAY
+
+                putExtra(
+                    PlaybackService.EXTRA_INDEX,
+                    index
+                )
+            }
+
+            ContextCompat.startForegroundService(
+                this@MainActivity,
+                intent
+            )
+        }
+
+        @JavascriptInterface
+        fun togglePlay() {
+
+            val intent = android.content.Intent(
+                this@MainActivity,
+                PlaybackService::class.java
+            ).apply {
+
+                action = PlaybackService.ACTION_TOGGLE
+            }
+
+            ContextCompat.startForegroundService(
+                this@MainActivity,
+                intent
+            )
+        }
+
+        @JavascriptInterface
+        fun next() {
+
+            val intent = android.content.Intent(
+                this@MainActivity,
+                PlaybackService::class.java
+            ).apply {
+
+                action = PlaybackService.ACTION_NEXT
+            }
+
+            ContextCompat.startForegroundService(
+                this@MainActivity,
+                intent
+            )
+        }
+
+        @JavascriptInterface
+        fun previous() {
+
+            val intent = android.content.Intent(
+                this@MainActivity,
+                PlaybackService::class.java
+            ).apply {
+
+                action = PlaybackService.ACTION_PREVIOUS
+            }
+
+            ContextCompat.startForegroundService(
+                this@MainActivity,
+                intent
+            )
+        }
+
+        @JavascriptInterface
+        fun setVolume(value: Double) {
+
+            val intent = android.content.Intent(
+                this@MainActivity,
+                PlaybackService::class.java
+            ).apply {
+
+                action = PlaybackService.ACTION_VOLUME
+
+                putExtra(
+                    PlaybackService.EXTRA_VOLUME,
+                    value.toFloat()
+                )
+            }
+
+            startService(intent)
+        }
+    }
+
+    override fun onDestroy() {
+
+        if (::webView.isInitialized) {
+            webView.stopLoading()
+            webView.destroy()
+        }
+
+        super.onDestroy()
+    }
+}
