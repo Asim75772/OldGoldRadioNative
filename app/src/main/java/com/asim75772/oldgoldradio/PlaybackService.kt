@@ -15,14 +15,43 @@ class PlaybackService : Service() {
     private var mediaPlayer: MediaPlayer? = null
 
     companion object {
-        const val ACTION_PLAY = "com.asim75772.oldgoldradio.PLAY"
-        const val ACTION_STOP = "com.asim75772.oldgoldradio.STOP"
 
-        private const val CHANNEL_ID = "old_gold_radio"
-        private const val NOTIFICATION_ID = 1001
+        const val ACTION_PLAY =
+            "com.asim75772.oldgoldradio.PLAY"
 
-        // এখানে আপনার radio stream URL বসাবেন
-        const val RADIO_URL = "https://example.com/radio.mp3"
+        const val ACTION_STOP =
+            "com.asim75772.oldgoldradio.STOP"
+
+        const val ACTION_TOGGLE =
+            "com.asim75772.oldgoldradio.TOGGLE"
+
+        const val ACTION_NEXT =
+            "com.asim75772.oldgoldradio.NEXT"
+
+        const val ACTION_PREVIOUS =
+            "com.asim75772.oldgoldradio.PREVIOUS"
+
+        const val ACTION_VOLUME =
+            "com.asim75772.oldgoldradio.VOLUME"
+
+        const val EXTRA_INDEX =
+            "extra_index"
+
+        const val EXTRA_VOLUME =
+            "extra_volume"
+
+        private const val CHANNEL_ID =
+            "old_gold_radio"
+
+        private const val NOTIFICATION_ID =
+            1001
+
+        /*
+         * আপাতত এই URL রাখা হলো।
+         * পরে আপনার আসল radio stream URL এখানে বসাব।
+         */
+        const val RADIO_URL =
+            "https://example.com/radio.mp3"
     }
 
     override fun onCreate() {
@@ -48,10 +77,40 @@ class PlaybackService : Service() {
                 playRadio()
             }
 
+            ACTION_TOGGLE -> {
+                if (mediaPlayer?.isPlaying == true) {
+                    pauseRadio()
+                } else {
+                    playRadio()
+                }
+            }
+
             ACTION_STOP -> {
                 stopRadio()
-                stopForeground(STOP_FOREGROUND_REMOVE)
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+
                 stopSelf()
+            }
+
+            ACTION_NEXT -> {
+                playRadio()
+            }
+
+            ACTION_PREVIOUS -> {
+                playRadio()
+            }
+
+            ACTION_VOLUME -> {
+                val volume =
+                    intent.getFloatExtra(EXTRA_VOLUME, 1.0f)
+
+                setVolume(volume)
             }
 
             else -> {
@@ -76,15 +135,23 @@ class PlaybackService : Service() {
 
                 setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setUsage(
+                            AudioAttributes.USAGE_MEDIA
+                        )
+                        .setContentType(
+                            AudioAttributes.CONTENT_TYPE_MUSIC
+                        )
                         .build()
                 )
 
                 setDataSource(RADIO_URL)
 
-                setOnPreparedListener {
-                    start()
+                setOnPreparedListener { player ->
+                    player.start()
+                }
+
+                setOnCompletionListener {
+                    stopRadio()
                 }
 
                 setOnErrorListener { _, _, _ ->
@@ -96,6 +163,21 @@ class PlaybackService : Service() {
             }
 
         } catch (e: Exception) {
+
+            e.printStackTrace()
+        }
+    }
+
+    private fun pauseRadio() {
+
+        try {
+
+            if (mediaPlayer?.isPlaying == true) {
+                mediaPlayer?.pause()
+            }
+
+        } catch (e: Exception) {
+
             e.printStackTrace()
         }
     }
@@ -103,31 +185,74 @@ class PlaybackService : Service() {
     private fun stopRadio() {
 
         try {
-            mediaPlayer?.stop()
-        } catch (_: Exception) {
-        }
 
-        mediaPlayer?.release()
-        mediaPlayer = null
+            if (mediaPlayer != null) {
+
+                if (mediaPlayer?.isPlaying == true) {
+                    mediaPlayer?.stop()
+                }
+
+                mediaPlayer?.reset()
+                mediaPlayer?.release()
+            }
+
+        } catch (e: Exception) {
+
+            e.printStackTrace()
+
+        } finally {
+
+            mediaPlayer = null
+        }
+    }
+
+    private fun setVolume(volume: Float) {
+
+        val safeVolume =
+            volume.coerceIn(0.0f, 1.0f)
+
+        mediaPlayer?.setVolume(
+            safeVolume,
+            safeVolume
+        )
     }
 
     private fun createNotification(): Notification {
 
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        return if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.O
+        ) {
 
-            Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle("Old Gold Radio")
-                .setContentText("Radio is playing")
-                .setSmallIcon(android.R.drawable.ic_media_play)
+            Notification.Builder(
+                this,
+                CHANNEL_ID
+            )
+                .setContentTitle(
+                    "Old Gold Radio"
+                )
+                .setContentText(
+                    "Old Gold Radio is playing"
+                )
+                .setSmallIcon(
+                    android.R.drawable.ic_media_play
+                )
                 .setOngoing(true)
                 .build()
 
         } else {
 
+            @Suppress("DEPRECATION")
             Notification.Builder(this)
-                .setContentTitle("Old Gold Radio")
-                .setContentText("Radio is playing")
-                .setSmallIcon(android.R.drawable.ic_media_play)
+                .setContentTitle(
+                    "Old Gold Radio"
+                )
+                .setContentText(
+                    "Old Gold Radio is playing"
+                )
+                .setSmallIcon(
+                    android.R.drawable.ic_media_play
+                )
                 .setOngoing(true)
                 .build()
         }
@@ -135,18 +260,29 @@ class PlaybackService : Service() {
 
     private fun createNotificationChannel() {
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.O
+        ) {
 
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Old Gold Radio",
-                NotificationManager.IMPORTANCE_LOW
-            )
+            val channel =
+                NotificationChannel(
+                    CHANNEL_ID,
+                    "Old Gold Radio",
+                    NotificationManager.IMPORTANCE_LOW
+                )
+
+            channel.description =
+                "Old Gold Radio playback"
 
             val manager =
-                getSystemService(NotificationManager::class.java)
+                getSystemService(
+                    NotificationManager::class.java
+                )
 
-            manager.createNotificationChannel(channel)
+            manager.createNotificationChannel(
+                channel
+            )
         }
     }
 
@@ -157,7 +293,10 @@ class PlaybackService : Service() {
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
+    override fun onBind(
+        intent: Intent?
+    ): IBinder? {
+
         return null
     }
 }
